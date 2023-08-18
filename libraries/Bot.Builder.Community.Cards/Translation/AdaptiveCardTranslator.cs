@@ -17,6 +17,8 @@ namespace Bot.Builder.Community.Cards.Translation
         private const string MicrosoftTranslatorKey = "MicrosoftTranslatorKey";
         private const string MicrosoftTranslatorLocale = "MicrosoftTranslatorLocale";
         private const string MicrosoftTranslatorEndpoint = "MicrosoftTranslatorEndpoint";
+        private const string MicrosoftTranslatorRegionKey = "MicrosoftTranslatorRegionKey";
+        private static string MicrosoftTranslatorRegionValue = "eastus";
 
         private static readonly Uri DefaultBaseAddress = new Uri("https://api.cognitive.microsofttranslator.com");
 
@@ -31,6 +33,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 configuration[MicrosoftTranslatorKey],
                 configuration[MicrosoftTranslatorLocale]);
 
+            MicrosoftTranslatorRegionValue=configuration[MicrosoftTranslatorRegionKey];
             var endpoint = configuration[MicrosoftTranslatorEndpoint];
 
             if (!string.IsNullOrWhiteSpace(endpoint))
@@ -82,6 +85,70 @@ namespace Bot.Builder.Community.Cards.Translation
                 cancellationToken).ConfigureAwait(false);
         }
 
+        public static async Task<List<string>> TranslateTextsAsync(
+             List<string> inputs,
+         MicrosoftTranslatorConfig config,
+         AdaptiveCardTranslatorSettings settings = null,
+         CancellationToken cancellationToken = default)
+        {
+            if (config is null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            return await TranslateTextsAsync(
+                inputs,
+                config.TargetLocale,
+                config.SubscriptionKey,
+                config.HttpClient,
+                settings,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        public static async Task<List< string>> TranslateTextsAsync(
+           List<string> inputs,
+           string targetLocale,
+           string subscriptionKey,
+           HttpClient httpClient = null,
+           AdaptiveCardTranslatorSettings settings = null,
+           CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(subscriptionKey))
+            {
+                throw new ArgumentNullException(nameof(subscriptionKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(targetLocale))
+            {
+                throw new ArgumentNullException(nameof(targetLocale));
+            }
+
+            // From Cognitive Services translation documentation:
+            // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
+            var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
+
+            using (var request = new HttpRequestMessage())
+            {
+                var client = httpClient ?? LazyClient.Value;
+                var baseUri = client.BaseAddress ?? DefaultBaseAddress;
+
+                request.Method = HttpMethod.Post;
+                request.RequestUri = new Uri(baseUri, $"translate?api-version=3.0&to={targetLocale}");
+                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+                request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+                request.Headers.Add("Ocp-Apim-Subscription-Region", MicrosoftTranslatorRegionValue);
+
+                var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+                response.EnsureSuccessStatusCode();
+
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
+
+                return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+            }
+        }
+
         public static async Task<T> TranslateAsync<T>(
             T card,
             string targetLocale,
@@ -117,6 +184,7 @@ namespace Bot.Builder.Community.Cards.Translation
                         request.RequestUri = new Uri(baseUri, $"translate?api-version=3.0&to={targetLocale}");
                         request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
                         request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+                        request.Headers.Add("Ocp-Apim-Subscription-Region", MicrosoftTranslatorRegionValue);
 
                         var response = await client.SendAsync(request, innerCancellationToken).ConfigureAwait(false);
 

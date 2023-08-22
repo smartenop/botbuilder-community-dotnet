@@ -9,11 +9,14 @@ using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Azure.AI.OpenAI;
 
 namespace Bot.Builder.Community.Cards.Translation
 {
-    public class AdaptiveCardTranslator
+    public class AdaptiveCardTranslatorGPT
     {
+        private static string translatorInstructionEN;
+        private static string translatorInstructionAR;
         private const string MicrosoftTranslatorKey = "MicrosoftTranslatorKey";
         private const string MicrosoftTranslatorLocale = "MicrosoftTranslatorLocale";
         private const string MicrosoftTranslatorEndpoint = "MicrosoftTranslatorEndpoint";
@@ -27,7 +30,7 @@ namespace Bot.Builder.Community.Cards.Translation
             BaseAddress = DefaultBaseAddress,
         });
 
-        public AdaptiveCardTranslator(IConfiguration configuration)
+        public AdaptiveCardTranslatorGPT(IConfiguration configuration)
         {
             MicrosoftTranslatorConfig = new MicrosoftTranslatorConfig(
                 configuration[MicrosoftTranslatorKey],
@@ -35,6 +38,8 @@ namespace Bot.Builder.Community.Cards.Translation
 
             MicrosoftTranslatorRegionValue = configuration[MicrosoftTranslatorRegionKey];
             var endpoint = configuration[MicrosoftTranslatorEndpoint];
+            translatorInstructionEN = configuration.GetValue<string>("translatorInstructionEN");
+            translatorInstructionAR = configuration.GetValue<string>("translatorInstructionAR");
 
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
@@ -105,6 +110,83 @@ namespace Bot.Builder.Community.Cards.Translation
                 cancellationToken).ConfigureAwait(false);
         }
 
+        private static async Task<List<string>> TranslateWithGPT(
+            List<string> inputs,
+            string targetLocale
+        )
+        {
+            var endpoint = new Uri("https://demo-moh-opeanai.openai.azure.com/");
+            var credentials = new Azure.AzureKeyCredential("3fe866e8b4c14109983e3d9ab1716bd7");
+            var deployementID = "Gpt3.5: Demo-MOH-gpt-35-turbo";
+            var openAIClient = new OpenAIClient(endpoint, credentials);
+
+
+            var prompt = @"
+            {instructionEN}
+            User:
+            [
+                ""مرحبا"", ""عندى صداع""
+            ]
+
+
+            Assistant: [
+                ""Hello"", ""I have a headache""
+            ]
+
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+            prompt = prompt.Replace("{instructionEN}", translatorInstructionEN);
+
+            if (targetLocale == "ar")
+            {
+                prompt = @"
+            {instructionAR}
+            User:
+            [
+                ""Hello"", ""I have a headache""
+            ]
+
+
+            Assistant: [
+                ""مرحبا"", ""عندى صداع""
+            ]
+
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+                prompt = prompt.Replace("{instructionAR}", translatorInstructionAR);
+
+            }
+
+            Console.WriteLine("User Prompt" + prompt);
+
+            var json = JsonConvert.SerializeObject(inputs.Select(input => new { input }));
+            prompt = prompt.Replace("{userInput}", json);
+
+            var completionOptions = new CompletionsOptions
+            {
+                Prompts = { prompt },
+                MaxTokens = 1024,
+                Temperature = 0f,
+                FrequencyPenalty = 0.0f,
+                PresencePenalty = 0.0f,
+                NucleusSamplingFactor = 1 // Top P
+            };
+
+            Completions response = await openAIClient.GetCompletionsAsync(deployementID, completionOptions);
+
+            Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
+
+            return response.Choices.First().Text.Split(',').ToList();
+        }
+
         public static async Task<List<string>> TranslateTextsAsync(
            List<string> inputs,
            string targetLocale,
@@ -123,30 +205,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 throw new ArgumentNullException(nameof(targetLocale));
             }
 
-            // From Cognitive Services translation documentation:
-            // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
-            var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
-
-            using (var request = new HttpRequestMessage())
-            {
-                var client = httpClient ?? LazyClient.Value;
-                var baseUri = client.BaseAddress ?? DefaultBaseAddress;
-
-                request.Method = HttpMethod.Post;
-                request.RequestUri = new Uri(baseUri, $"translate?api-version=3.0&to={targetLocale}");
-                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
-                request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
-                request.Headers.Add("Ocp-Apim-Subscription-Region", MicrosoftTranslatorRegionValue);
-
-                var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-                response.EnsureSuccessStatusCode();
-
-                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
-
-                return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
-            }
+            return await TranslateWithGPT(inputs, targetLocale);
         }
 
         public static async Task<T> TranslateAsync<T>(
@@ -171,30 +230,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 async (inputs, innerCancellationToken) =>
                 {
-                    // From Cognitive Services translation documentation:
-                    // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
-                    var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
-
-                    using (var request = new HttpRequestMessage())
-                    {
-                        var client = httpClient ?? LazyClient.Value;
-                        var baseUri = client.BaseAddress ?? DefaultBaseAddress;
-
-                        request.Method = HttpMethod.Post;
-                        request.RequestUri = new Uri(baseUri, $"translate?api-version=3.0&to={targetLocale}");
-                        request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
-                        request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
-                        request.Headers.Add("Ocp-Apim-Subscription-Region", MicrosoftTranslatorRegionValue);
-
-                        var response = await client.SendAsync(request, innerCancellationToken).ConfigureAwait(false);
-
-                        response.EnsureSuccessStatusCode();
-
-                        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
-
-                        return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
-                    }
+                    return await TranslateWithGPT(inputs.ToList(), targetLocale);
                 },
                 settings,
                 cancellationToken).ConfigureAwait(false);

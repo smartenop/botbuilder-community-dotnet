@@ -92,6 +92,86 @@ namespace Bot.Builder.Community.Cards.Translation
             return await TranslateWithGPT(inputs, config);
         }
 
+        public static async Task<List<string>> TranslateTextAsync(
+        string input,
+        AzureOpenAIConfig config,
+        AdaptiveCardTranslatorSettings settings = null,
+        CancellationToken cancellationToken = default)
+        {
+            if (config is null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            if (string.IsNullOrWhiteSpace(config.SubscriptionKey))
+            {
+                throw new ArgumentNullException(nameof(config.SubscriptionKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(config.TargetLocale))
+            {
+                throw new ArgumentNullException(nameof(config.TargetLocale));
+            }
+
+            return await TranslateWithGPT(input, config);
+        }
+
+        private static async Task<List<string>> TranslateWithGPT(
+            string input,
+            AzureOpenAIConfig config
+        )
+        {
+            var prompt = @"
+            {instructionEN}
+           
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+            prompt = prompt.Replace("{instructionEN}", config.PromptEN);
+
+            if (config.TargetLocale == "ar")
+            {
+                prompt = @"
+            {instructionAR}
+            
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+                prompt = prompt.Replace("{instructionAR}", config.PromptAR);
+
+            }
+
+            prompt = prompt.Replace("{userInput}", input);
+
+            Console.WriteLine("User Prompt" + prompt);
+
+
+            var completionOptions = new CompletionsOptions
+            {
+                Prompts = { prompt },
+                MaxTokens = 2048,
+                Temperature = 0f,
+                FrequencyPenalty = 0.0f,
+                PresencePenalty = 0.0f,
+                NucleusSamplingFactor = 1 // Top P
+            };
+
+            var openAIClient = new OpenAIClient(new Uri(config.Endpoint), new Azure.AzureKeyCredential(config.SubscriptionKey));
+            Completions response = await openAIClient.GetCompletionsAsync(config.DeployementID, completionOptions);
+
+            Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
+
+            char[] cArray = { '"' };
+
+            return response.Choices.First().Text.Split('#').Select(x => x.Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+        }
+
         private static async Task<List<string>> TranslateWithGPT(
             List<string> inputs,
             AzureOpenAIConfig config

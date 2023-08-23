@@ -33,7 +33,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 configuration[MicrosoftTranslatorKey],
                 configuration[MicrosoftTranslatorLocale]);
 
-            MicrosoftTranslatorRegionValue=configuration[MicrosoftTranslatorRegionKey];
+            MicrosoftTranslatorRegionValue = configuration[MicrosoftTranslatorRegionKey];
             var endpoint = configuration[MicrosoftTranslatorEndpoint];
 
             if (!string.IsNullOrWhiteSpace(endpoint))
@@ -105,7 +105,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 cancellationToken).ConfigureAwait(false);
         }
 
-        public static async Task<List< string>> TranslateTextsAsync(
+        public static async Task<List<string>> TranslateTextsAsync(
            List<string> inputs,
            string targetLocale,
            string subscriptionKey,
@@ -245,8 +245,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 // If the card is already a JObject then we want to make sure
                 // it gets copied instead of modified in place
                 cardJObject = (JObject)jObject.DeepClone();
-            }
-            else
+            } else
             {
                 cardJObject = card.ToJObject(true) ?? throw new ArgumentException(
                     "The Adaptive Card is not an appropriate type or is serialized incorrectly.",
@@ -258,7 +257,7 @@ namespace Bot.Builder.Community.Cards.Translation
             var translations = await translateManyAsync(
                 tokens.Select(Convert.ToString),
                 cancellationToken).ConfigureAwait(false);
-            
+
             if (translations != null)
             {
                 foreach (var (token, translation) in tokens.Zip(translations, Tuple.Create))

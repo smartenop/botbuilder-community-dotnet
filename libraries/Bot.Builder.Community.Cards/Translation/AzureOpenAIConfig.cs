@@ -6,21 +6,23 @@ namespace Bot.Builder.Community.Cards.Translation
 {
     public class AzureOpenAIConfig
     {
-        public AzureOpenAIConfig(string endpoint, string key, string deployementID)
+        public AzureOpenAIConfig(string endpoint, string key, string deployementID, string promptAR, string promptEN, string targetLocale = null, HttpClient httpClient = null)
         {
-            AzureEndpoint = endpoint;
+            Endpoint = endpoint;
             SubscriptionKey = key;
             DeployementID = deployementID;
+            PromptAR = promptAR;
+            PromptEN = promptEN;
+            TargetLocale = targetLocale;
         }
 
-        public string AzureEndpoint { get; set; }
+        public string Endpoint { get; set; }
         public string SubscriptionKey { get; set; }
         public string DeployementID { get; set; }
 
         public string PromptAR { get; set; }
         public string PromptEN { get; set; }
-        public Uri Endpoint { get; set; }
-        public Azure.AzureKeyCredential AzureKeyCredential { get; set; }
-        public OpenAIClient Client { get; set; }
+
+        public string TargetLocale { get; set; }
     }
 }

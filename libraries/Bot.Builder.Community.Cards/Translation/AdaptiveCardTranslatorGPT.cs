@@ -101,15 +101,11 @@ namespace Bot.Builder.Community.Cards.Translation
             {instructionEN}
             User:
             [
-                ""مرحبا"", ""عندى صداع""
+                ""Hello"", ""I have a headache"",""""It sounds like you would like to report the following symptoms:\n- Feeling sick or queasy\n""""
             ]
-
-
             Assistant:
-                ""Hello # I have a headache""
-
-            User: {userInput}
-
+                ""مرحبا # عندى صداع # يبدو أنك ترغب في الإبلاغ عن الأعراض التالية:  \n  شعور المرض أو الغثيان \n""
+            User: [""It sounds like you would like to report the following symptoms:\n- headache""]
             Assistant:
 
             ";
@@ -122,15 +118,11 @@ namespace Bot.Builder.Community.Cards.Translation
             {instructionAR}
             User:
             [
-                ""Hello"", ""I have a headache""
+                ""Hello"", ""I have a headache"",""""It sounds like you would like to report the following symptoms:\n- Feeling sick or queasy\n""""
             ]
-
-
             Assistant:
-                ""مرحبا # عندى صداع""
-
-            User: {userInput}
-
+                ""مرحبا # عندى صداع # يبدو أنك ترغب في الإبلاغ عن الأعراض التالية:  \n  شعور المرض أو الغثيان \n""
+            User: [""It sounds like you would like to report the following symptoms:\n- headache""]
             Assistant:
 
             ";

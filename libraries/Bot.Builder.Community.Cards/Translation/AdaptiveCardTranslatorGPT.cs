@@ -31,6 +31,11 @@ namespace Bot.Builder.Community.Cards.Translation
 
         public AdaptiveCardTranslatorSettings Settings { get; set; } = DefaultSettings;
 
+        private static string Trim(string text)
+        {
+            return text.Trim(new Char[] { ' ', '*', '\\', '"', '-' });
+        }
+
         public AzureOpenAIConfig AzureOpenAIConfig { get; set; }
         public static async Task<T> TranslateAsync<T>(
             T card,
@@ -144,7 +149,7 @@ namespace Bot.Builder.Community.Cards.Translation
             var completionOptions = new CompletionsOptions
             {
                 Prompts = { prompt },
-                MaxTokens = 1024,
+                MaxTokens = 2048,
                 Temperature = 0f,
                 FrequencyPenalty = 0.0f,
                 PresencePenalty = 0.0f,

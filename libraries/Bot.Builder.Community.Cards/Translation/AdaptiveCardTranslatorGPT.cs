@@ -126,7 +126,7 @@ namespace Bot.Builder.Community.Cards.Translation
             ]
 
 
-            Assistant: 
+            Assistant:
                 ""مرحبا # عندى صداع""
 
             User: {userInput}
@@ -162,7 +162,8 @@ namespace Bot.Builder.Community.Cards.Translation
             Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
 
             char[] cArray = { '"' };
-            return response.Choices.First().Text.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList();
+
+            return response.Choices.First().Text.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
         }
 
         public static async Task<T> TranslateAsync<T>(

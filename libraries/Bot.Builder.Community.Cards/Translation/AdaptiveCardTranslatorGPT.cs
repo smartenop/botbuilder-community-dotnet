@@ -123,7 +123,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptSingleEN ?? config.PromptEN));
             }
 
-            Console.WriteLine("User Prompt" + input);
+            Console.WriteLine("User Prompt: " + input);
 
             OpenAIClient client = new OpenAIClient(new Uri(config.Endpoint), new AzureKeyCredential(config.SubscriptionKey));
 
@@ -132,7 +132,7 @@ namespace Bot.Builder.Community.Cards.Translation
             Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
-            Console.WriteLine("ChatGPT4 response : " + completion);
+            Console.WriteLine("ChatGPT4 response: " + completion);
 
             char[] cArray = { '"' };
 
@@ -206,7 +206,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptEN));
             }
 
-            Console.WriteLine("User Prompt : " + prompt);
+            Console.WriteLine("User Prompt: " + prompt);
 
             OpenAIClient client = new OpenAIClient(new Uri(config.Endpoint), new AzureKeyCredential(config.SubscriptionKey));
 
@@ -222,7 +222,7 @@ namespace Bot.Builder.Community.Cards.Translation
             Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
             string completion = Trim(completionsResponse.Value.Choices[0].Message.Content);
 
-            Console.WriteLine("ChatGPT4 response" + completion);
+            Console.WriteLine("ChatGPT4 response: " + completion);
 
             char[] cArray = { '"' };
             try
@@ -287,7 +287,7 @@ namespace Bot.Builder.Community.Cards.Translation
             var json = JsonConvert.SerializeObject(inputs);
             prompt = prompt.Replace("{userInput}", json);
 
-            Console.WriteLine("User Prompt" + prompt);
+            Console.WriteLine("User Prompt: " + prompt);
 
 
             var completionOptions = new CompletionsOptions
@@ -343,7 +343,7 @@ namespace Bot.Builder.Community.Cards.Translation
 
             prompt = prompt.Replace("{userInput}", input);
 
-            Console.WriteLine("User Prompt" + prompt);
+            Console.WriteLine("User Prompt: " + prompt);
 
 
             var completionOptions = new CompletionsOptions

@@ -122,7 +122,7 @@ namespace Bot.Builder.Community.Cards.Translation
             {
                 throw new ArgumentNullException(nameof(targetLocale));
             }
-
+            Console.WriteLine("User Prompt: " + JsonConvert.SerializeObject(inputs));
             // From Cognitive Services translation documentation:
             // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
             var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
@@ -173,6 +173,8 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 async (inputs, innerCancellationToken) =>
                 {
+                    Console.WriteLine("User Prompt: " + JsonConvert.SerializeObject(inputs));
+
                     // From Cognitive Services translation documentation:
                     // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
                     var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));

@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Microsoft.Bot.Schema;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Bot.Schema;
-using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Bot.Builder.Community.Cards.Translation
 {
@@ -144,8 +144,10 @@ namespace Bot.Builder.Community.Cards.Translation
 
                 var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
+                var translatorResults = result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                Console.WriteLine("Microsft Translator response: " + JsonConvert.SerializeObject(translatorResults));
 
-                return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                return translatorResults;
             }
         }
 
@@ -193,7 +195,10 @@ namespace Bot.Builder.Community.Cards.Translation
                         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
 
-                        return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                        var translatorResults =result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                        Console.WriteLine("Microsft Translator response: " + JsonConvert.SerializeObject(translatorResults));
+
+                        return translatorResults;
                     }
                 },
                 settings,
@@ -245,7 +250,8 @@ namespace Bot.Builder.Community.Cards.Translation
                 // If the card is already a JObject then we want to make sure
                 // it gets copied instead of modified in place
                 cardJObject = (JObject)jObject.DeepClone();
-            } else
+            }
+            else
             {
                 cardJObject = card.ToJObject(true) ?? throw new ArgumentException(
                     "The Adaptive Card is not an appropriate type or is serialized incorrectly.",

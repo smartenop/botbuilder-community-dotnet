@@ -132,7 +132,7 @@ namespace Bot.Builder.Community.Cards.Translation
             Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
             string completion = completionsResponse.Value.Choices[0].Message.Content;
 
-            Console.WriteLine("ChatGPT response : " + completion);
+            Console.WriteLine("ChatGPT4 response : " + completion);
 
             char[] cArray = { '"' };
 
@@ -205,13 +205,10 @@ namespace Bot.Builder.Community.Cards.Translation
 
                 chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptEN));
             }
-           
+
             Console.WriteLine("User Prompt : " + prompt);
 
             OpenAIClient client = new OpenAIClient(new Uri(config.Endpoint), new AzureKeyCredential(config.SubscriptionKey));
-
-          
-           
 
             foreach (var message in samples)
             {
@@ -221,14 +218,26 @@ namespace Bot.Builder.Community.Cards.Translation
 
             chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.User, prompt));
 
-            Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
-            string completion = completionsResponse.Value.Choices[0].Message.Content;
 
-            Console.WriteLine("ChatGPT response" + completion);
+            Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
+            string completion = Trim(completionsResponse.Value.Choices[0].Message.Content);
+
+            Console.WriteLine("ChatGPT4 response" + completion);
 
             char[] cArray = { '"' };
+            try
+            {
+                string[] tranlations = JsonConvert.DeserializeObject<string[]>(completion);
+
+                return tranlations.Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            }
+            catch (Exception ex)
+            {
+
+            }
 
             return completion.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+
         }
 
         private static async Task<List<string>> TranslateWithGPT(

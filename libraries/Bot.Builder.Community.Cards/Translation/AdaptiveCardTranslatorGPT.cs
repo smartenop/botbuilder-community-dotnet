@@ -1,14 +1,13 @@
-﻿using System;
+﻿using Azure;
+using Azure.AI.OpenAI;
+using Microsoft.Bot.Schema;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure;
-using Azure.AI.OpenAI;
-using Microsoft.Bot.Schema;
-using Microsoft.IdentityModel.Clients.ActiveDirectory;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Bot.Builder.Community.Cards.Translation
 {
@@ -31,14 +30,6 @@ namespace Bot.Builder.Community.Cards.Translation
             },
         };
 
-        public AdaptiveCardTranslatorSettings Settings { get; set; } = DefaultSettings;
-
-        private static string Trim(string text)
-        {
-            return text.Trim(new Char[] { ' ', '*', '\\', '"', '-' });
-        }
-
-        public AzureOpenAIConfig AzureOpenAIConfig { get; set; }
         public static async Task<T> TranslateAsync<T>(
             T card,
             AzureOpenAIConfig config,
@@ -135,8 +126,12 @@ namespace Bot.Builder.Community.Cards.Translation
             Console.WriteLine("ChatGPT4 response: " + completion);
 
             char[] cArray = { '"' };
+            if (config.RunForEveryRecord != null)
+            {
+                return completion.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
 
-            return completion.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            return completion.Split('#').ToList();
         }
 
         private static async Task<List<string>> TranslateWithGPT4(
@@ -217,26 +212,37 @@ namespace Bot.Builder.Community.Cards.Translation
             }
 
             chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.User, prompt));
-
-
             Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
-            string completion = Trim(completionsResponse.Value.Choices[0].Message.Content);
-
+            string completion = completionsResponse.Value.Choices[0].Message.Content;
+            if (config.RunForEveryRecord != null)
+            {
+                completion = config.RunForEveryRecord(completionsResponse.Value.Choices[0].Message.Content);
+            }
+            
             Console.WriteLine("ChatGPT4 response: " + completion);
 
             char[] cArray = { '"' };
             try
             {
                 string[] tranlations = JsonConvert.DeserializeObject<string[]>(completion);
+                if (config.RunForEveryRecord != null)
+                {
+                    return tranlations.ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+                }
 
-                return tranlations.Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+                return tranlations.ToList();
             }
             catch (Exception ex)
             {
 
             }
 
-            return completion.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            if (config.RunForEveryRecord != null)
+            {
+                return completion.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
+
+            return completion.Split('#').ToList();
 
         }
 
@@ -306,8 +312,12 @@ namespace Bot.Builder.Community.Cards.Translation
             Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
 
             char[] cArray = { '"' };
+            if(config.RunForEveryRecord != null)
+            {
+                return response.Choices.First().Text.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
 
-            return response.Choices.First().Text.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            return response.Choices.First().Text.Split('#').ToList();
         }
 
         private static async Task<List<string>> TranslateWithGPT(
@@ -362,8 +372,12 @@ namespace Bot.Builder.Community.Cards.Translation
             Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
 
             char[] cArray = { '"' };
+            if (config.RunForEveryRecord != null)
+            {
+                return response.Choices.First().Text.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
 
-            return response.Choices.First().Text.Split('#').Select(x => x.Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            return response.Choices.First().Text.Split('#').ToList();
         }
 
         public static async Task<T> TranslateAsync<T>(
@@ -416,8 +430,6 @@ namespace Bot.Builder.Community.Cards.Translation
 
             return card.FromJObject(cardJObject);
         }
-
-
 
         private static List<JToken> GetTokensToTranslate(
             JObject cardJObject,

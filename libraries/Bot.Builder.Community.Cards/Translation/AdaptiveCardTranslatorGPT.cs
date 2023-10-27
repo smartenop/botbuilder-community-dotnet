@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Bot.Schema;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Bot.Builder.Community.Cards.Translation
 {
@@ -29,14 +30,6 @@ namespace Bot.Builder.Community.Cards.Translation
             },
         };
 
-        public AdaptiveCardTranslatorSettings Settings { get; set; } = DefaultSettings;
-
-        private static string Trim(string text)
-        {
-            return text.Trim(new Char[] { ' ', '*', '\\', '"', '-' });
-        }
-
-        public AzureOpenAIConfig AzureOpenAIConfig { get; set; }
         public static async Task<T> TranslateAsync<T>(
             T card,
             AzureOpenAIConfig config,
@@ -62,7 +55,10 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 async (inputs, innerCancellationToken) =>
                 {
-                    return await TranslateWithGPT(inputs.ToList(), config);
+                    if (inputs.Count() == 1)
+                        return await TranslateWithGPT4(inputs.First(), config);
+
+                    return await TranslateWithGPT4(inputs.ToList(), config);
                 },
                 settings,
                 cancellationToken).ConfigureAwait(false);
@@ -89,7 +85,165 @@ namespace Bot.Builder.Community.Cards.Translation
                 throw new ArgumentNullException(nameof(config.TargetLocale));
             }
 
-            return await TranslateWithGPT(inputs, config);
+            if (inputs.Count() == 1)
+                return await TranslateWithGPT4(inputs.First(), config);
+
+            return await TranslateWithGPT4(inputs, config);
+        }
+
+        private static async Task<List<string>> TranslateWithGPT4(
+          string input,
+          AzureOpenAIConfig config
+      )
+        {
+            List<TranslationSamples> samples = new List<TranslationSamples>();
+            var chatCompletionsOptions = new ChatCompletionsOptions()
+            {
+                Temperature = 0,
+                MaxTokens = 2024,
+                FrequencyPenalty = 0,
+                PresencePenalty = 0,
+                NucleusSamplingFactor = 1
+            };
+            if (config.TargetLocale == "ar")
+            {
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptSingelAR ?? config.PromptAR));
+            }
+            else
+            {
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptSingleEN ?? config.PromptEN));
+            }
+
+            Console.WriteLine("User Prompt: " + input);
+
+            OpenAIClient client = new OpenAIClient(new Uri(config.Endpoint), new AzureKeyCredential(config.SubscriptionKey));
+
+            chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.User, input));
+
+            Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
+            string completion = completionsResponse.Value.Choices[0].Message.Content;
+
+            Console.WriteLine("ChatGPT4 response: " + completion);
+
+            char[] cArray = { '"' };
+            if (config.RunForEveryRecord != null)
+            {
+                return completion.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
+
+            return completion.Split('#').ToList();
+        }
+
+        private static async Task<List<string>> TranslateWithGPT4(
+           List<string> inputs,
+           AzureOpenAIConfig config
+       )
+        {
+            var prompt = JsonConvert.SerializeObject(inputs);
+            List<TranslationSamples> samples = new List<TranslationSamples>();
+            var chatCompletionsOptions = new ChatCompletionsOptions()
+            {
+                Temperature = 0,
+                MaxTokens = 2024,
+                FrequencyPenalty = 0,
+                PresencePenalty = 0,
+                NucleusSamplingFactor = 1
+            };
+
+            if (config.TargetLocale == "ar")
+            {
+                samples.Add(new TranslationSamples
+                {
+                    AsistantText = "مرحبا",
+                    userText = "Hello"
+                });
+                samples.Add(new TranslationSamples
+                {
+                    AsistantText = "يبدو أنك ترغب في الإبلاغ عن الأعراض التالية \\: n\\-الشعور بالمرض أو الغثيان\\n",
+                    userText = "It sounds like you would like to report the following symptoms:\n- Feeling sick or queasy\n"
+                });
+                samples.Add(new TranslationSamples
+                {
+                    AsistantText = "عندى صداع.",
+                    userText = "I have a headache."
+                });
+                samples.Add(new TranslationSamples
+                {
+                    AsistantText = "يكمل",
+                    userText = "continue"
+                });
+
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptAR));
+            }
+            else
+            {
+                samples.Add(new TranslationSamples
+                {
+                    userText = "مرحبا",
+                    AsistantText = "Hello"
+                });
+                samples.Add(new TranslationSamples
+                {
+                    userText = "يبدو أنك ترغب في الإبلاغ عن الأعراض التالية \\: n\\-الشعور بالمرض أو الغثيان\\n",
+                    AsistantText = "It sounds like you would like to report the following symptoms:\n- Feeling sick or queasy\n"
+                });
+                samples.Add(new TranslationSamples
+                {
+                    userText = "عندى صداع.",
+                    AsistantText = "I have a headache."
+                });
+                samples.Add(new TranslationSamples
+                {
+                    userText = "يكمل",
+                    AsistantText = "continue"
+                });
+
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.System, config.PromptEN));
+            }
+
+            Console.WriteLine("User Prompt: " + prompt);
+
+            OpenAIClient client = new OpenAIClient(new Uri(config.Endpoint), new AzureKeyCredential(config.SubscriptionKey));
+
+            foreach (var message in samples)
+            {
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.User, message.userText));
+                chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.Assistant, message.AsistantText));
+            }
+
+            chatCompletionsOptions.Messages.Add(new ChatMessage(ChatRole.User, prompt));
+            Azure.Response<ChatCompletions> completionsResponse = await client.GetChatCompletionsAsync(config.DeployementID, chatCompletionsOptions);
+            string completion = completionsResponse.Value.Choices[0].Message.Content;
+            if (config.RunForEveryRecord != null)
+            {
+                completion = config.RunForEveryRecord(completionsResponse.Value.Choices[0].Message.Content);
+            }
+            
+            Console.WriteLine("ChatGPT4 response: " + completion);
+
+            char[] cArray = { '"' };
+            try
+            {
+                string[] tranlations = JsonConvert.DeserializeObject<string[]>(completion);
+                if (config.RunForEveryRecord != null)
+                {
+                    return tranlations.ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+                }
+
+                return tranlations.ToList();
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+            if (config.RunForEveryRecord != null)
+            {
+                return completion.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
+
+            return completion.Split('#').ToList();
+
         }
 
         private static async Task<List<string>> TranslateWithGPT(
@@ -139,7 +293,7 @@ namespace Bot.Builder.Community.Cards.Translation
             var json = JsonConvert.SerializeObject(inputs);
             prompt = prompt.Replace("{userInput}", json);
 
-            Console.WriteLine("User Prompt" + prompt);
+            Console.WriteLine("User Prompt: " + prompt);
 
 
             var completionOptions = new CompletionsOptions
@@ -158,8 +312,72 @@ namespace Bot.Builder.Community.Cards.Translation
             Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
 
             char[] cArray = { '"' };
+            if(config.RunForEveryRecord != null)
+            {
+                return response.Choices.First().Text.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
 
-            return response.Choices.First().Text.Split('#').Select(x => x.Trim('"').Replace("\\n-", Environment.NewLine)).ToList().Select(x => Trim(x)).ToList();
+            return response.Choices.First().Text.Split('#').ToList();
+        }
+
+        private static async Task<List<string>> TranslateWithGPT(
+            string input,
+            AzureOpenAIConfig config
+        )
+        {
+            var prompt = @"
+            {instructionEN}
+           
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+            prompt = prompt.Replace("{instructionEN}", config.PromptSingleEN ?? config.PromptEN);
+
+            if (config.TargetLocale == "ar")
+            {
+                prompt = @"
+            {instructionAR}
+            
+            User: {userInput}
+
+            Assistant:
+
+            ";
+
+                prompt = prompt.Replace("{instructionAR}", config.PromptSingelAR ?? config.PromptAR);
+
+            }
+
+            prompt = prompt.Replace("{userInput}", input);
+
+            Console.WriteLine("User Prompt: " + prompt);
+
+
+            var completionOptions = new CompletionsOptions
+            {
+                Prompts = { prompt },
+                MaxTokens = 2048,
+                Temperature = 0f,
+                FrequencyPenalty = 0.0f,
+                PresencePenalty = 0.0f,
+                NucleusSamplingFactor = 1 // Top P
+            };
+
+            var openAIClient = new OpenAIClient(new Uri(config.Endpoint), new Azure.AzureKeyCredential(config.SubscriptionKey));
+            Completions response = await openAIClient.GetCompletionsAsync(config.DeployementID, completionOptions);
+
+            Console.WriteLine("ChatGPT response" + response.Choices.First().Text);
+
+            char[] cArray = { '"' };
+            if (config.RunForEveryRecord != null)
+            {
+                return response.Choices.First().Text.Split('#').ToList().Select(x => config.RunForEveryRecord(x)).ToList();
+            }
+
+            return response.Choices.First().Text.Split('#').ToList();
         }
 
         public static async Task<T> TranslateAsync<T>(
@@ -185,7 +403,8 @@ namespace Bot.Builder.Community.Cards.Translation
                 // If the card is already a JObject then we want to make sure
                 // it gets copied instead of modified in place
                 cardJObject = (JObject)jObject.DeepClone();
-            } else
+            }
+            else
             {
                 cardJObject = card.ToJObject(true) ?? throw new ArgumentException(
                     "The Adaptive Card is not an appropriate type or is serialized incorrectly.",
@@ -211,8 +430,6 @@ namespace Bot.Builder.Community.Cards.Translation
 
             return card.FromJObject(cardJObject);
         }
-
-
 
         private static List<JToken> GetTokensToTranslate(
             JObject cardJObject,
@@ -289,5 +506,11 @@ namespace Bot.Builder.Community.Cards.Translation
                     && (grandparent as JProperty)?.Name == AdaptiveProperties.Facts
                     && parent.Type == JTokenType.Array);
         }
+    }
+
+    public class TranslationSamples
+    {
+        public string userText { get; set; }
+        public string AsistantText { get; set; }
     }
 }

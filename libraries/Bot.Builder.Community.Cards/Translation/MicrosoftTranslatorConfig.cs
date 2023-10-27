@@ -22,5 +22,7 @@ namespace Bot.Builder.Community.Cards.Translation
         public string TargetLocale { get; set; }
 
         public HttpClient HttpClient { get; set; }
+
+        public string TargetRegion { get; set; }
     }
 }

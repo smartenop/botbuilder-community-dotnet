@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Microsoft.Bot.Schema;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Bot.Schema;
-using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Bot.Builder.Community.Cards.Translation
 {
@@ -80,6 +80,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 config.TargetLocale,
                 config.SubscriptionKey,
+                config.TargetRegion,
                 config.HttpClient,
                 settings,
                 cancellationToken).ConfigureAwait(false);
@@ -122,7 +123,7 @@ namespace Bot.Builder.Community.Cards.Translation
             {
                 throw new ArgumentNullException(nameof(targetLocale));
             }
-
+            Console.WriteLine("User Prompt: " + JsonConvert.SerializeObject(inputs));
             // From Cognitive Services translation documentation:
             // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
             var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
@@ -144,8 +145,10 @@ namespace Bot.Builder.Community.Cards.Translation
 
                 var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
+                var translatorResults = result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                Console.WriteLine("Microsft Translator response: " + JsonConvert.SerializeObject(translatorResults));
 
-                return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                return translatorResults;
             }
         }
 
@@ -153,6 +156,7 @@ namespace Bot.Builder.Community.Cards.Translation
             T card,
             string targetLocale,
             string subscriptionKey,
+            string targetRegion,
             HttpClient httpClient = null,
             AdaptiveCardTranslatorSettings settings = null,
             CancellationToken cancellationToken = default)
@@ -171,6 +175,8 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 async (inputs, innerCancellationToken) =>
                 {
+                    Console.WriteLine("User Prompt: " + JsonConvert.SerializeObject(inputs));
+
                     // From Cognitive Services translation documentation:
                     // https://docs.microsoft.com/en-us/azure/cognitive-services/translator/quickstart-csharp-translate
                     var requestBody = JsonConvert.SerializeObject(inputs.Select(input => new { Text = input }));
@@ -184,7 +190,7 @@ namespace Bot.Builder.Community.Cards.Translation
                         request.RequestUri = new Uri(baseUri, $"translate?api-version=3.0&to={targetLocale}");
                         request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
                         request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
-                        request.Headers.Add("Ocp-Apim-Subscription-Region", MicrosoftTranslatorRegionValue);
+                        request.Headers.Add("Ocp-Apim-Subscription-Region", targetRegion??MicrosoftTranslatorRegionValue);
 
                         var response = await client.SendAsync(request, innerCancellationToken).ConfigureAwait(false);
 
@@ -193,7 +199,10 @@ namespace Bot.Builder.Community.Cards.Translation
                         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         var result = JsonConvert.DeserializeObject<TranslatorResponse[]>(responseBody);
 
-                        return result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                        var translatorResults =result.Select(translatorResponse => translatorResponse?.Translations?.FirstOrDefault()?.Text).ToList();
+                        Console.WriteLine("Microsft Translator response: " + JsonConvert.SerializeObject(translatorResults));
+
+                        return translatorResults;
                     }
                 },
                 settings,
@@ -245,7 +254,8 @@ namespace Bot.Builder.Community.Cards.Translation
                 // If the card is already a JObject then we want to make sure
                 // it gets copied instead of modified in place
                 cardJObject = (JObject)jObject.DeepClone();
-            } else
+            }
+            else
             {
                 cardJObject = card.ToJObject(true) ?? throw new ArgumentException(
                     "The Adaptive Card is not an appropriate type or is serialized incorrectly.",
@@ -292,6 +302,7 @@ namespace Bot.Builder.Community.Cards.Translation
                 card,
                 targetLocale,
                 MicrosoftTranslatorConfig.SubscriptionKey,
+                MicrosoftTranslatorConfig.TargetRegion,
                 MicrosoftTranslatorConfig.HttpClient,
                 Settings,
                 cancellationToken).ConfigureAwait(false);
